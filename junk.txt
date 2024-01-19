@@ -1,5 +1,7 @@
 a.out
 junk.txt
+pipe
+pipe.c
 runit.sh
 shell
 shell.c

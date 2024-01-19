@@ -13,6 +13,9 @@ int main(int argc, char **argv) {
 char history[MAX_HIS_SIZE][MAXLINE];
 int count = 0;
 
+bool concurrenly = false;
+
+
 // interactive shell to process commands
 int interactiveShell() {
   bool should_run = true;
@@ -48,6 +51,7 @@ int interactiveShell() {
   free(line);
   return 0;
 }
+
 void addTobookmark(char *line) {
     if(count < MAX_HIS_SIZE){
       strncpy(history[count],line,MAXLINE - 1);
@@ -65,7 +69,7 @@ void displayBookmarks() {
 }
 void runPrevCommand(){
    if(count == 0 || history[count - 1][0] == '\0'){
-    printf("No previos connnand\n");   
+    printf("No previos command\n");   
    } else{
     printf("Run previous command : %s\n",history[count - 1]);        
     // Implement the code to execute the command here
@@ -76,6 +80,7 @@ void processLine(char *line) {
   
   printf("processing line: %s\n",line);
   char *args[25];
+  int i = 0;
   parse_input(line,args);
   
 char current_directory[130];
@@ -84,11 +89,9 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
 } else {
     perror("getcwd failed");
 }
-
-  pid_t p = fork();
-  if (p == 0) {
-    // Child process  
     bool concurrenly = false;
+    int pipeLoc;
+    //int i;
    //name a file descriptor
     int out_file = -1;
     int in_file =  -1;
@@ -99,17 +102,25 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
       if(equal(args[i], "<")){
         in_file = i + 1;
       }
-      // if(equal(args[i],";")){
-      //   args[i]= NULL;// Terminate the command at the semicolon
-      // }
-      //"&" found
-      if(equal(args[i],"&")){
+      if(equal(args[i], "&")){//mean there are second command set
         concurrenly = true;
-      }
-    }
-     
-     
-    //input redirection
+        args[i] = NULL;  // Remove the "&" from args
+        
+      }   
+      // if(equal(args[i], "|")){
+      //   pipeLoc = i;
+      //   break;
+      // }
+      
+      
+    } //for loop end
+  
+
+    
+  pid_t p1 = fork();
+  if (p1 == 0) {
+  // Child process  
+  //input redirection
     if (in_file != -1 && args[in_file] != NULL) {
         char input_path[PATH_MAX];
         snprintf(input_path, PATH_MAX, "%s/junk.txt", current_directory); //docker container permission problem
@@ -117,7 +128,6 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
         dup2(redirect_fd, STDIN_FILENO); // Connect file descriptor to stdin
         close(redirect_fd);
         args[in_file - 1] = NULL; //reset the flag back to -1
-        // args[in_file] = NULL; //removing from the args array
     }
     
     //output redirection
@@ -126,19 +136,37 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
     dup2(redirect_fd,STDOUT_FILENO); //connect file descriptor into stdout
     close(redirect_fd);
     args[out_file - 1] = NULL;
-    // args[out_file] = NULL;
   }
-  
-  execvp(args[0],args);
-
-   
+    execvp(args[0],args);  
   }else {
-    // Parent process  
-      int status;  
-      wait(&status);
+// Parent process 
+    //printf("[%d] %d\n", p1, p1);
+    int status;
+    waitpid(p1, &status, 0); // Wait for the specific child process to finish
+    if (WIFEXITED(status)) {
+            // Child process exited normally
+            //printf("[%d] +  Done                    ls\n", p1);
+        }
+    if(concurrenly){
+        execvp(args[2], args);
+    }
+    return 0;
   }
+
+    // if (concurrenly) {
+    // pid_t p2 = fork();
+    // if (p2 == 0) {
+    //   if(args[2] != NULL){
+    //     // Child process for the second command
+    //     execvp(args[2], args); 
+    //   }       
+    // } 
+    
+   }
+        
+  //parent process end
+ 
   
-}   
 
 
 int runTests() {
@@ -170,17 +198,40 @@ int fetchline(char **line) {
   return n;
 }
 
-void parse_input(char *input,char *args[]){
+void parse_input(char *input,char *tokens[]){
+    bool concurrenly = false;
     int args_count = 0;
-    char *tokens[25];
+    // char *tokens[25];
     char *pch = strtok(input," ");//ex:return "ls"
     // char *ampersend = strtok(input,"&");
     while(pch != NULL){
       // char *ampersend = strtok(input,"&");
+      if(equal(pch,"&")){
+        concurrenly = true;
+        // break;
+      }
       printf("Token [%d]: %s\n", args_count, pch);
-      args[args_count++] = pch;
+      tokens[args_count++] = pch;
       pch = strtok(NULL," ");
     }   
-      args[args_count] = NULL; // Null-terminate the array
+      tokens[args_count] = NULL; // Null-terminate the array
   }
-
+  
+// void callpipe(char *args,int pipeLoc){
+//   //create pipe
+//   enum {READ,WRITE};
+//   int fd[2];
+//   pipe(fd);
+//   int pid = fork();
+//   if(pid == 0){
+//     close(fd[READ]);
+//     dup2(fd[WRITE],STDOUT_FILENO);
+//     args[pipeLoc] = NULL;
+//     execvp(args[0],args);  
+//   }else{
+//     close(fd[WRITE]);
+//     dup2(fd[READ],STDIN_FILENO);
+//     execvp(args[pipeLoc + 1], &args[pipeLoc + 1]);
+//   }
+  
+// }

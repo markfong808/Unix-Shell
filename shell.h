@@ -28,5 +28,6 @@ void addTobookmark(char *line);
 void displayBookmarks();
 void runPrevCommand();
 void parse_input();
+void split_commands();
 int main();
 #endif
