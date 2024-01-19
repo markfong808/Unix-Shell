@@ -80,6 +80,7 @@ void processLine(char *line) {
   
   printf("processing line: %s\n",line);
   char *args[25];
+  char *args2[25];//second command buffer
   int i = 0;
   parse_input(line,args);
   
@@ -105,6 +106,9 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
       if(equal(args[i], "&")){//mean there are second command set
         concurrenly = true;
         args[i] = NULL;  // Remove the "&" from args
+        args2[0] = args[i + 1];  // Store the next command in args2
+            args2[1] = NULL;
+            break;
         
       }   
       // if(equal(args[i], "|")){
@@ -143,14 +147,20 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
     //printf("[%d] %d\n", p1, p1);
     int status;
     waitpid(p1, &status, 0); // Wait for the specific child process to finish
-    if (WIFEXITED(status)) {
-            // Child process exited normally
-            //printf("[%d] +  Done                    ls\n", p1);
-        }
+    // if (WIFEXITED(status)) {
+    //         // Child process exited normally
+    //         //printf("[%d] +  Done                    ls\n", p1);
+    //     }
     if(concurrenly){
-        execvp(args[2], args);
+        pid_t p2 = fork();
+      if(p2 == 0){
+        execvp(args2[0], args2);
+      }else{
+        int status2;
+        waitpid(p2, &status2, 0); // Wait for the second child process to finish
+
+      }
     }
-    return 0;
   }
 
     // if (concurrenly) {
