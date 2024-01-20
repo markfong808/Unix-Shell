@@ -14,7 +14,7 @@ char history[MAX_HIS_SIZE][MAXLINE];
 int count = 0;
 
 bool concurrenly = false;
-
+int pipeLoc;
 
 // interactive shell to process commands
 int interactiveShell() {
@@ -91,9 +91,8 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
     perror("getcwd failed");
 }
     bool concurrenly = false;
-    bool waitflag = false;
-    int pipeLoc;
-    //int i;
+    bool pipeflag = false;
+    
    //name a file descriptor
     int out_file = -1;
     int in_file =  -1;
@@ -117,10 +116,11 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
             args2 = args + i + 1;            
             break;        
       }   
-      // if(equal(args[i], "|")){
-      //   pipeLoc = i;
-      //   break;
-      // }
+      if(equal(args[i], "|")){ //find the pipe location
+        pipeLoc = i;
+        pipeflag = true;
+        break;
+      }
          
     } //for loop end
   
@@ -166,6 +166,17 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
               
       }      
   }
+  if(pipeflag){// mean there is pipe
+    int pid3 = fork();
+    if(pid3 == 0){
+      callpipe(args,pipeLoc);
+      //execvp(args[0],args[0]);
+    }else {
+        int status3;
+        waitpid(pid3, &status3, 0);
+    }
+    
+  }
 }
     
 }
@@ -206,6 +217,7 @@ int fetchline(char **line) {
 
 void parse_input(char *input,char *tokens[]){
     bool concurrenly = false;
+    bool pipeflag = false;
     int args_count = 0;
     char *pch = strtok(input," ");//ex:return "ls"
     while(pch != NULL){
@@ -215,6 +227,9 @@ void parse_input(char *input,char *tokens[]){
       if(equal(pch,";")){
         concurrenly  = false;
       }
+      if(equal(pch,"|")){
+        pipeflag = true;
+        }
       printf("Token [%d]: %s\n", args_count, pch);
       tokens[args_count++] = pch;
       pch = strtok(NULL," ");
@@ -226,21 +241,21 @@ void parse_input(char *input,char *tokens[]){
       tokens[args_count] = NULL; // Null-terminate the array
   }
   
-// void callpipe(char *args,int pipeLoc){
-//   //create pipe
-//   enum {READ,WRITE};
-//   int fd[2];
-//   pipe(fd);
-//   int pid = fork();
-//   if(pid == 0){
-//     close(fd[READ]);
-//     dup2(fd[WRITE],STDOUT_FILENO);
-//     args[pipeLoc] = NULL;
-//     execvp(args[0],args);  
-//   }else{
-//     close(fd[WRITE]);
-//     dup2(fd[READ],STDIN_FILENO);
-//     execvp(args[pipeLoc + 1], &args[pipeLoc + 1]);
-//   }
+void callpipe(char *args[],int pipeLoc){
+  //create pipe
+  enum {READ,WRITE};
+  int fd[2];
+  pipe(fd);
+  int pid = fork();
+  if(pid == 0){
+    close(fd[READ]);
+    dup2(fd[WRITE],STDOUT_FILENO);
+    args[pipeLoc] = NULL;
+    execvp(args[0],args);  
+  }else{
+    close(fd[WRITE]);
+    dup2(fd[READ],STDIN_FILENO);
+    execvp(args[pipeLoc + 1], &args[pipeLoc + 1]);
+  }
   
-// }
+}
