@@ -29,5 +29,7 @@ void displayBookmarks();
 void runPrevCommand();
 void parse_input();
 void split_commands();
+void callpipe();
+void printAsciiArt(); 
 int main();
 #endif
