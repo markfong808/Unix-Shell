@@ -80,7 +80,7 @@ void processLine(char *line) {
   
   printf("processing line: %s\n",line);
   char *args[25];
-  char *args2[25];//second command buffer
+  char **args2;//second command buffer
   int i = 0;
   parse_input(line,args);
   
@@ -91,6 +91,7 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
     perror("getcwd failed");
 }
     bool concurrenly = false;
+    bool waitflag = false;
     int pipeLoc;
     //int i;
    //name a file descriptor
@@ -103,20 +104,24 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
       if(equal(args[i], "<")){
         in_file = i + 1;
       }
+      if(equal(args[i],";")){
+        concurrenly = true;
+        args[i] = NULL;
+        args2 = args + i + 1;
+        args2[i] = NULL;
+        break;
+      }
       if(equal(args[i], "&")){//mean there are second command set
         concurrenly = true;
         args[i] = NULL;  // Remove the "&" from args
-        args2[0] = args[i + 1];  // Store the next command in args2
-            args2[1] = NULL;
-            break;
-        
+            args2 = args + i + 1;            
+            break;        
       }   
       // if(equal(args[i], "|")){
       //   pipeLoc = i;
       //   break;
       // }
-      
-      
+         
     } //for loop end
   
 
@@ -127,7 +132,7 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
   //input redirection
     if (in_file != -1 && args[in_file] != NULL) {
         char input_path[PATH_MAX];
-        snprintf(input_path, PATH_MAX, "%s/junk.txt", current_directory); //docker container permission problem
+        snprintf(input_path, PATH_MAX, "%s/%s", current_directory,args[in_file]); //docker container permission problem
         int redirect_fd = open(input_path, O_RDONLY);
         dup2(redirect_fd, STDIN_FILENO); // Connect file descriptor to stdin
         close(redirect_fd);
@@ -136,43 +141,34 @@ if (getcwd(current_directory, sizeof(current_directory)) != NULL) {
     
     //output redirection
     if(out_file != -1 && args[out_file] != NULL){
-    int redirect_fd = open(strcat(current_directory, "/junk.txt"), O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU); 
+    char out_path[PATH_MAX];
+    snprintf(out_path, PATH_MAX, "%s/%s", current_directory,args[out_file]);
+    int redirect_fd = open(out_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU); 
     dup2(redirect_fd,STDOUT_FILENO); //connect file descriptor into stdout
     close(redirect_fd);
     args[out_file - 1] = NULL;
   }
+  
     execvp(args[0],args);  
+    
   }else {
 // Parent process 
-    //printf("[%d] %d\n", p1, p1);
     int status;
     waitpid(p1, &status, 0); // Wait for the specific child process to finish
-    // if (WIFEXITED(status)) {
-    //         // Child process exited normally
-    //         //printf("[%d] +  Done                    ls\n", p1);
-    //     }
-    if(concurrenly){
-        pid_t p2 = fork();
+ 
+    if(concurrenly){ //second comand condition check
+      pid_t p2 = fork();
       if(p2 == 0){
         execvp(args2[0], args2);
       }else{
-        int status2;
+        int status2;        
         waitpid(p2, &status2, 0); // Wait for the second child process to finish
-
-      }
-    }
+              
+      }      
   }
-
-    // if (concurrenly) {
-    // pid_t p2 = fork();
-    // if (p2 == 0) {
-    //   if(args[2] != NULL){
-    //     // Child process for the second command
-    //     execvp(args[2], args); 
-    //   }       
-    // } 
+}
     
-   }
+}
         
   //parent process end
  
@@ -211,19 +207,22 @@ int fetchline(char **line) {
 void parse_input(char *input,char *tokens[]){
     bool concurrenly = false;
     int args_count = 0;
-    // char *tokens[25];
     char *pch = strtok(input," ");//ex:return "ls"
-    // char *ampersend = strtok(input,"&");
     while(pch != NULL){
-      // char *ampersend = strtok(input,"&");
       if(equal(pch,"&")){
         concurrenly = true;
-        // break;
+      }
+      if(equal(pch,";")){
+        concurrenly  = false;
       }
       printf("Token [%d]: %s\n", args_count, pch);
       tokens[args_count++] = pch;
       pch = strtok(NULL," ");
     }   
+     if(equal(tokens[args_count - 1],";")){
+            tokens[args_count - 1] = NULL; // ";" at the end serve nothing
+
+     }
       tokens[args_count] = NULL; // Null-terminate the array
   }
   
