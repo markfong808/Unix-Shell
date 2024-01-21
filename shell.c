@@ -70,7 +70,7 @@ void runPrevCommand() {
     printf("No previos command\n");
   } else {
     printf("Run previous command : %s\n", history[count - 1]);
-    // Implement the code to execute the command here
+    // Implement the code to execute the command
     system(history[count - 1]);
   }
 }
@@ -81,6 +81,7 @@ void processLine(char *line) {
   char **args2; // second command buffer
   int i = 0;
   parse_input(line, args);
+  
   // Check for the 'ascii' command
   if (equal(line, "ascii")) {
     printAsciiArt();
@@ -109,7 +110,6 @@ void processLine(char *line) {
       concurrenly = true;
       args[i] = NULL;
       args2 = args + i + 1;
-      //args2[i] = NULL;
       break;
     }
     if (equal(args[i], "&")) { // mean there are second command set
@@ -125,12 +125,11 @@ void processLine(char *line) {
       break;
     }
   } // for loop end
-  
-  for(int i = 0; args[i] != NULL; i++){
-    
+
   pid_t p1 = fork();
   if (p1 == 0) {
     // Child process
+    
     // input redirection
     if (in_file != -1 && args[in_file] != NULL) {
       char input_path[PATH_MAX];
@@ -159,6 +158,19 @@ void processLine(char *line) {
       close(redirect_fd);
       args[out_file - 1] = NULL;
     }
+    
+    if (pipeflag) { 
+      
+      callpipe(args, pipeLoc);
+      
+    }
+    execvp(args[0], args);
+
+  } else {
+    // Parent process
+    int status;
+    waitpid(p1, &status, 0); // Wait for the specific child process to finish
+
     if (concurrenly) { // second comand condition check
       pid_t p2 = fork();
       if (p2 == 0) {
@@ -168,46 +180,8 @@ void processLine(char *line) {
         waitpid(p2, &status2, 0); // Wait for the second child process to finish
       }
     }
-    if (pipeflag) { // mean there is pipe
-      //int pid3 = fork();
-      //if (pid3 == 0) {
-        callpipe(args, pipeLoc);
-        break;
-      // } else {
-      //   int status3;
-      //   waitpid(pid3, &status3, 0);
-      // }
-    }
-    execvp(args[0], args);
-
-  } else {
-    // Parent process
-    int status;
-    waitpid(p1, &status, 0); // Wait for the specific child process to finish
-
-    // if (concurrenly) { // second comand condition check
-    //   pid_t p2 = fork();
-    //   if (p2 == 0) {
-    //     execvp(args2[0], args2);
-    //   } else {
-    //     int status2;
-    //     waitpid(p2, &status2, 0); // Wait for the second child process to finish
-    //   }
-    // }
-    // if (pipeflag) { // mean there is pipe
-    //   int pid3 = fork();
-    //   if (pid3 == 0) {
-    //     callpipe(args, pipeLoc);
-    //   } else {
-    //     int status3;
-    //     waitpid(pid3, &status3, 0);
-    //   }
-    // }
-   }
- } //for loop ends
-}
-
-// parent process end
+  }
+} // parent process end
 
 int runTests() {
   printf("*** Running basic tests ***\n");
@@ -266,11 +240,10 @@ void callpipe(char *args[], int pipeLoc) {
     args[pipeLoc] = NULL;
     execvp(args[0], args);
   } else {
-    //parent process   
+    // parent process
     close(fd[WRITE]);
     dup2(fd[READ], STDIN_FILENO);
     execvp(args[pipeLoc + 1], &args[pipeLoc + 1]);
-    
   }
 }
 
