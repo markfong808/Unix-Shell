@@ -109,7 +109,7 @@ void processLine(char *line) {
       concurrenly = true;
       args[i] = NULL;
       args2 = args + i + 1;
-      args2[i] = NULL;
+      //args2[i] = NULL;
       break;
     }
     if (equal(args[i], "&")) { // mean there are second command set
@@ -120,12 +120,14 @@ void processLine(char *line) {
     }
     if (equal(args[i], "|")) { // find the pipe location
       pipeLoc = i;
+      args[i] = NULL;
       pipeflag = true;
       break;
     }
-
   } // for loop end
-
+  
+  for(int i = 0; args[i] != NULL; i++){
+    
   pid_t p1 = fork();
   if (p1 == 0) {
     // Child process
@@ -135,6 +137,10 @@ void processLine(char *line) {
       snprintf(input_path, PATH_MAX, "%s/%s", current_directory,
                args[in_file]); // docker container permission problem
       int redirect_fd = open(input_path, O_RDONLY);
+      if (redirect_fd == -1) {
+        perror("open input file failed");
+        exit(EXIT_FAILURE);
+      }
       dup2(redirect_fd, STDIN_FILENO); // Connect file descriptor to stdin
       close(redirect_fd);
       args[in_file - 1] = NULL; // reset the flag back to -1
@@ -145,18 +151,14 @@ void processLine(char *line) {
       char out_path[PATH_MAX];
       snprintf(out_path, PATH_MAX, "%s/%s", current_directory, args[out_file]);
       int redirect_fd = open(out_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
+      if (redirect_fd == -1) {
+        perror("open output file failed");
+        exit(EXIT_FAILURE);
+      }
       dup2(redirect_fd, STDOUT_FILENO); // connect file descriptor into stdout
       close(redirect_fd);
       args[out_file - 1] = NULL;
     }
-
-    execvp(args[0], args);
-
-  } else {
-    // Parent process
-    int status;
-    waitpid(p1, &status, 0); // Wait for the specific child process to finish
-
     if (concurrenly) { // second comand condition check
       pid_t p2 = fork();
       if (p2 == 0) {
@@ -167,16 +169,42 @@ void processLine(char *line) {
       }
     }
     if (pipeflag) { // mean there is pipe
-      int pid3 = fork();
-      if (pid3 == 0) {
+      //int pid3 = fork();
+      //if (pid3 == 0) {
         callpipe(args, pipeLoc);
-        // execvp(args[0],args[0]);
-      } else {
-        int status3;
-        waitpid(pid3, &status3, 0);
-      }
+        break;
+      // } else {
+      //   int status3;
+      //   waitpid(pid3, &status3, 0);
+      // }
     }
-  }
+    execvp(args[0], args);
+
+  } else {
+    // Parent process
+    int status;
+    waitpid(p1, &status, 0); // Wait for the specific child process to finish
+
+    // if (concurrenly) { // second comand condition check
+    //   pid_t p2 = fork();
+    //   if (p2 == 0) {
+    //     execvp(args2[0], args2);
+    //   } else {
+    //     int status2;
+    //     waitpid(p2, &status2, 0); // Wait for the second child process to finish
+    //   }
+    // }
+    // if (pipeflag) { // mean there is pipe
+    //   int pid3 = fork();
+    //   if (pid3 == 0) {
+    //     callpipe(args, pipeLoc);
+    //   } else {
+    //     int status3;
+    //     waitpid(pid3, &status3, 0);
+    //   }
+    // }
+   }
+ } //for loop ends
 }
 
 // parent process end
@@ -216,15 +244,6 @@ void parse_input(char *input, char *tokens[]) {
   int args_count = 0;
   char *pch = strtok(input, " "); // ex:return "ls"
   while (pch != NULL) {
-    if (equal(pch, "&")) {
-      concurrenly = true;
-    }
-    if (equal(pch, ";")) {
-      concurrenly = false;
-    }
-    if (equal(pch, "|")) {
-      pipeflag = true;
-    }
     printf("Token [%d]: %s\n", args_count, pch);
     tokens[args_count++] = pch;
     pch = strtok(NULL, " ");
@@ -247,9 +266,11 @@ void callpipe(char *args[], int pipeLoc) {
     args[pipeLoc] = NULL;
     execvp(args[0], args);
   } else {
+    //parent process   
     close(fd[WRITE]);
     dup2(fd[READ], STDIN_FILENO);
     execvp(args[pipeLoc + 1], &args[pipeLoc + 1]);
+    
   }
 }
 
