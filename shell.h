@@ -23,13 +23,16 @@ bool equal(char *a, char *b);
 int fetchline(char **line);
 int interactiveShell();
 int runTests();
-void processLine(char *line);
-void addTobookmark(char *line);
-void displayBookmarks();
-void runPrevCommand();
-void parse_input();
-void split_commands();
-void callpipe();
+char **tokenize();
+bool parse();
+int findPipe();
+int doPipe();
+int child();
+char *historyGet();
+void historySet();
+void doCommand(char **args, int start, int end, bool waitfor);
+void remIO();
 void printAsciiArt(); 
 int main();
+
 #endif
