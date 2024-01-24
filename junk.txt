@@ -1,6 +1,0 @@
-a.out
-junk.txt
-runit.sh
-shell
-shell.c
-shell.h
